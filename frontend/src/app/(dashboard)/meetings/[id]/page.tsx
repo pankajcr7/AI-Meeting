@@ -35,6 +35,7 @@ import {
   RefreshCw,
   Check,
   AlertCircle,
+  Share2,
 } from 'lucide-react';
 import { TranscriptViewer } from '@/components/meetings/TranscriptViewer';
 import { MeetingSummary } from '@/components/meetings/MeetingSummary';
@@ -92,6 +93,7 @@ export default function MeetingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -161,6 +163,23 @@ export default function MeetingDetailPage() {
     }
   };
 
+  const handleSyncAll = async () => {
+    setSyncingAll(true);
+    try {
+      const res = await api.post(`/integrations/sync-all/${id}`);
+      const { synced, failed } = res.data.data;
+      if (failed > 0) {
+        toast.success(`Synced ${synced} items, ${failed} failed`);
+      } else {
+        toast.success(`Successfully synced ${synced} action items`);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.error?.message || 'Failed to sync');
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -187,6 +206,22 @@ export default function MeetingDetailPage() {
           <h1 className="text-2xl font-bold">{meeting.title}</h1>
         </div>
         <div className="flex items-center gap-2">
+          {meeting.status === 'completed' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleSyncAll}
+              disabled={syncingAll}
+            >
+              {syncingAll ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Share2 className="h-4 w-4" />
+              )}
+              Sync All Items
+            </Button>
+          )}
           {(meeting.status === 'failed' || meeting.status === 'completed') && (
             <Button
               variant="outline"

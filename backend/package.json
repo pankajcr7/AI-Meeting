@@ -8,6 +8,9 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@notionhq/client": "^5.14.0",
+    "@slack/web-api": "^7.15.0",
+    "axios": "^1.13.6",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",

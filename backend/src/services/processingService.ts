@@ -6,6 +6,7 @@ import {
   summarizeMeeting,
   extractActionItems,
 } from './openaiService';
+import { autoSyncActionItems } from './autoSyncService';
 
 export async function processMeeting(meetingId: string): Promise<void> {
   const meeting = await Meeting.findById(meetingId);
@@ -37,8 +38,9 @@ export async function processMeeting(meetingId: string): Promise<void> {
       }
     }
 
+    const createdItems = [];
     for (const item of actionItems) {
-      await ActionItem.create({
+      const created = await ActionItem.create({
         meeting: meeting._id,
         team: meeting.team,
         title: item.title,
@@ -48,11 +50,18 @@ export async function processMeeting(meetingId: string): Promise<void> {
         priority: item.priority || 'medium',
         status: 'pending',
       });
+      createdItems.push(created);
     }
 
     meeting.status = 'completed';
     meeting.processedAt = new Date();
     await meeting.save();
+
+    if (createdItems.length > 0) {
+      autoSyncActionItems(meeting.team.toString(), createdItems).catch((err) =>
+        console.error(`Background auto-sync error: ${err.message}`)
+      );
+    }
   } catch (error: any) {
     meeting.status = 'failed';
     meeting.errorMessage = error.message || 'Processing failed';

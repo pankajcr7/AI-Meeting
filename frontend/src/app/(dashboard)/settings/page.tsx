@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User, Copy, Check, Loader2 } from 'lucide-react';
 import { Team, TeamMember } from '@/types';
+import { IntegrationSettings } from '@/components/settings/IntegrationSettings';
 
 export default function SettingsPage() {
   const { user, team, refreshUser } = useAuth();
@@ -166,27 +167,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Integrations</CardTitle>
-          <CardDescription>Connect your favorite tools.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {['Slack', 'Notion', 'Asana'].map((name) => (
-              <div key={name} className="border rounded-lg p-4 text-center">
-                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-3">
-                  <span className="text-sm font-bold text-muted-foreground">
-                    {name[0]}
-                  </span>
-                </div>
-                <p className="font-medium text-sm">{name}</p>
-                <p className="text-xs text-muted-foreground mt-1">Coming soon</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <IntegrationSettings />
     </div>
   );
 }
