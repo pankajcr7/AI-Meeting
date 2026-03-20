@@ -1,0 +1,6 @@
+AI-Powered SaaS (Fastest Growth)
+
+AI Meeting Recorder + Action Tracker
+Pain: Teams waste hours on notes; action items get lost.
+
+Features: Auto-transcribe, summarize, extract tasks (owner/deadline), sync to Slack/Notion/Asana, reminders.Make in Nexjs + ts and backend in nodes js backend
