@@ -5,6 +5,7 @@ dotenv.config();
 const requiredEnvVars = [
   'MONGODB_URI',
   'JWT_SECRET',
+  'OPENAI_API_KEY',
 ] as const;
 
 for (const envVar of requiredEnvVars) {
@@ -21,4 +22,5 @@ export const config = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
 };

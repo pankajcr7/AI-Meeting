@@ -5,6 +5,7 @@ import { AuthRequest } from '../middleware/auth';
 import Meeting from '../models/Meeting';
 import ActionItem from '../models/ActionItem';
 import Team from '../models/Team';
+import { processMeeting } from '../services/processingService';
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
@@ -51,6 +52,10 @@ export const uploadMeeting = async (req: AuthRequest, res: Response): Promise<vo
 
     const populated = await Meeting.findById(meeting._id).populate('uploadedBy', 'name avatar email');
 
+    processMeeting(meeting._id.toString()).catch((err) => {
+      console.error('Processing failed:', err);
+    });
+
     res.status(201).json({ success: true, data: populated });
   } catch (error: any) {
     if (req.file && fs.existsSync(req.file.path)) {
@@ -90,6 +95,10 @@ export const saveRecording = async (req: AuthRequest, res: Response): Promise<vo
     });
 
     const populated = await Meeting.findById(meeting._id).populate('uploadedBy', 'name avatar email');
+
+    processMeeting(meeting._id.toString()).catch((err) => {
+      console.error('Processing failed:', err);
+    });
 
     res.status(201).json({ success: true, data: populated });
   } catch (error: any) {
@@ -278,5 +287,48 @@ export const streamAudio = async (req: AuthRequest, res: Response): Promise<void
     }
   } catch (error: any) {
     res.status(500).json({ success: false, error: { message: error.message, code: 'STREAM_FAILED' } });
+  }
+};
+
+export const processMeetingRoute = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+
+    if (!meeting) {
+      res.status(404).json({ success: false, error: { message: 'Meeting not found', code: 'NOT_FOUND' } });
+      return;
+    }
+
+    const belongs = await userBelongsToTeam(req.user._id.toString(), meeting.team.toString());
+    if (!belongs) {
+      res.status(403).json({ success: false, error: { message: 'Access denied', code: 'FORBIDDEN' } });
+      return;
+    }
+
+    if (meeting.status === 'completed') {
+      await ActionItem.deleteMany({ meeting: meeting._id });
+    }
+
+    if (!['processing', 'failed', 'completed'].includes(meeting.status)) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Meeting is currently being processed', code: 'ALREADY_PROCESSING' },
+      });
+      return;
+    }
+
+    meeting.status = 'processing';
+    meeting.errorMessage = undefined;
+    meeting.transcript = undefined;
+    meeting.summary = undefined;
+    await meeting.save();
+
+    processMeeting(meeting._id.toString()).catch((err) => {
+      console.error('Processing failed:', err);
+    });
+
+    res.status(202).json({ success: true, data: { message: 'Processing started' } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { message: error.message, code: 'PROCESS_FAILED' } });
   }
 };
