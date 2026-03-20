@@ -7,7 +7,7 @@ import { LayoutDashboard, Mic, Settings, FileAudio } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '#', label: 'Meetings', icon: FileAudio },
+  { href: '/meetings', label: 'Meetings', icon: FileAudio },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -26,7 +26,7 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
           return (
             <Link
               key={item.label}
