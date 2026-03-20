@@ -23,4 +23,12 @@ export const config = {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  SLACK_CLIENT_ID: process.env.SLACK_CLIENT_ID || '',
+  SLACK_CLIENT_SECRET: process.env.SLACK_CLIENT_SECRET || '',
+  SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET || '',
+  NOTION_CLIENT_ID: process.env.NOTION_CLIENT_ID || '',
+  NOTION_CLIENT_SECRET: process.env.NOTION_CLIENT_SECRET || '',
+  ASANA_CLIENT_ID: process.env.ASANA_CLIENT_ID || '',
+  ASANA_CLIENT_SECRET: process.env.ASANA_CLIENT_SECRET || '',
+  BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:5000/api',
 };

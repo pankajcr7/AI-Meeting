@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { ActionItem } from '@/types';
+import { ActionItem, Integration } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,12 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Plus,
   Pencil,
   Trash2,
@@ -39,6 +45,8 @@ import {
   CheckCircle2,
   Circle,
   Clock,
+  Share2,
+  ExternalLink,
 } from 'lucide-react';
 
 interface ActionItemsListProps {
@@ -61,6 +69,12 @@ const statusCycle: Record<string, string> = {
   pending: 'in-progress',
   'in-progress': 'completed',
   completed: 'pending',
+};
+
+const platformLabels: Record<string, { label: string; color: string }> = {
+  slack: { label: 'Slack', color: 'bg-[#4A154B] text-white' },
+  notion: { label: 'Notion', color: 'bg-black text-white' },
+  asana: { label: 'Asana', color: 'bg-[#F06A6A] text-white' },
 };
 
 function StatusIcon({ status }: { status: string }) {
@@ -93,6 +107,8 @@ export function ActionItemsList({ meetingId }: ActionItemsListProps) {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<ItemFormState>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [syncingItem, setSyncingItem] = useState<string | null>(null);
 
   const fetchItems = useCallback(async () => {
     try {
@@ -105,9 +121,19 @@ export function ActionItemsList({ meetingId }: ActionItemsListProps) {
     }
   }, [meetingId]);
 
+  const fetchIntegrations = useCallback(async () => {
+    try {
+      const res = await api.get('/integrations');
+      setIntegrations(res.data.data);
+    } catch {
+      // silently fail — integrations are optional
+    }
+  }, []);
+
   useEffect(() => {
     fetchItems();
-  }, [fetchItems]);
+    fetchIntegrations();
+  }, [fetchItems, fetchIntegrations]);
 
   const filteredItems = items.filter((item) => {
     if (filter === 'all') return true;
@@ -170,6 +196,41 @@ export function ActionItemsList({ meetingId }: ActionItemsListProps) {
       toast.success('Action item deleted');
     } catch {
       toast.error('Failed to delete');
+    }
+  };
+
+  const handleSyncToPlatform = async (itemId: string, platform: string) => {
+    setSyncingItem(`${itemId}-${platform}`);
+    try {
+      const res = await api.post(`/integrations/${platform}/sync/${itemId}`);
+      setItems((prev) =>
+        prev.map((i) =>
+          i._id === itemId
+            ? {
+                ...i,
+                syncedTo: [
+                  ...i.syncedTo,
+                  { platform: platform as any, externalId: res.data.data.externalId, syncedAt: new Date().toISOString() },
+                ],
+              }
+            : i
+        )
+      );
+      toast.success(`Synced to ${platformLabels[platform]?.label || platform}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error?.message || `Failed to sync to ${platform}`);
+    } finally {
+      setSyncingItem(null);
+    }
+  };
+
+  const handleSyncAllPlatforms = async (itemId: string) => {
+    for (const integration of integrations) {
+      const item = items.find((i) => i._id === itemId);
+      const alreadySynced = item?.syncedTo?.some((s) => s.platform === integration.type);
+      if (!alreadySynced) {
+        await handleSyncToPlatform(itemId, integration.type);
+      }
     }
   };
 
@@ -251,87 +312,149 @@ export function ActionItemsList({ meetingId }: ActionItemsListProps) {
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredItems.map((item) => (
-            <Card key={item._id} className="group hover:shadow-sm transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <button
-                    onClick={() => handleStatusToggle(item)}
-                    className="mt-0.5 shrink-0 hover:scale-110 transition-transform"
-                    title={`Click to change to ${statusCycle[item.status]}`}
-                  >
-                    <StatusIcon status={item.status} />
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <p
-                          className={`text-sm font-medium ${
-                            item.status === 'completed' ? 'line-through text-muted-foreground' : ''
-                          }`}
-                        >
-                          {item.title}
-                        </p>
-                        {item.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            {item.description}
+          {filteredItems.map((item) => {
+            const syncedPlatforms = item.syncedTo?.map((s) => s.platform) || [];
+            const unsyncedIntegrations = integrations.filter(
+              (int) => !syncedPlatforms.includes(int.type)
+            );
+
+            return (
+              <Card key={item._id} className="group hover:shadow-sm transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <button
+                      onClick={() => handleStatusToggle(item)}
+                      className="mt-0.5 shrink-0 hover:scale-110 transition-transform"
+                      title={`Click to change to ${statusCycle[item.status]}`}
+                    >
+                      <StatusIcon status={item.status} />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <p
+                            className={`text-sm font-medium ${
+                              item.status === 'completed' ? 'line-through text-muted-foreground' : ''
+                            }`}
+                          >
+                            {item.title}
                           </p>
+                          {item.description && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          {integrations.length > 0 && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  disabled={syncingItem?.startsWith(item._id) || false}
+                                >
+                                  {syncingItem?.startsWith(item._id) ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Share2 className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {unsyncedIntegrations.map((int) => (
+                                  <DropdownMenuItem
+                                    key={int.type}
+                                    onClick={() => handleSyncToPlatform(item._id, int.type)}
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5 mr-2" />
+                                    Sync to {platformLabels[int.type]?.label || int.type}
+                                  </DropdownMenuItem>
+                                ))}
+                                {unsyncedIntegrations.length > 1 && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleSyncAllPlatforms(item._id)}
+                                  >
+                                    <Share2 className="h-3.5 w-3.5 mr-2" />
+                                    Sync to All
+                                  </DropdownMenuItem>
+                                )}
+                                {unsyncedIntegrations.length === 0 && (
+                                  <DropdownMenuItem disabled>
+                                    <CheckCircle2 className="h-3.5 w-3.5 mr-2 text-green-600" />
+                                    Synced to all platforms
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(item)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete action item?</AlertDialogTitle>
+                                <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(item._id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 mt-2 flex-wrap">
+                        <Badge variant="outline" className={`text-[10px] ${priorityConfig[item.priority]?.className}`}>
+                          <Flag className="h-3 w-3 mr-1" />
+                          {priorityConfig[item.priority]?.label}
+                        </Badge>
+                        <Badge variant="outline" className={`text-[10px] ${statusConfig[item.status]?.className}`}>
+                          {statusConfig[item.status]?.label}
+                        </Badge>
+                        {item.assignee && item.assignee !== 'Unassigned' && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <User className="h-3 w-3" />
+                            {item.assignee}
+                          </span>
+                        )}
+                        {item.deadline && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(item.deadline).toLocaleDateString()}
+                          </span>
+                        )}
+                        {syncedPlatforms.length > 0 && (
+                          <span className="inline-flex items-center gap-1">
+                            {syncedPlatforms.map((p) => (
+                              <Badge
+                                key={p}
+                                className={`text-[9px] px-1.5 py-0 ${platformLabels[p]?.color || 'bg-gray-500 text-white'}`}
+                              >
+                                {platformLabels[p]?.label || p}
+                              </Badge>
+                            ))}
+                          </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(item)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete action item?</AlertDialogTitle>
-                              <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDelete(item._id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 mt-2 flex-wrap">
-                      <Badge variant="outline" className={`text-[10px] ${priorityConfig[item.priority]?.className}`}>
-                        <Flag className="h-3 w-3 mr-1" />
-                        {priorityConfig[item.priority]?.label}
-                      </Badge>
-                      <Badge variant="outline" className={`text-[10px] ${statusConfig[item.status]?.className}`}>
-                        {statusConfig[item.status]?.label}
-                      </Badge>
-                      {item.assignee && item.assignee !== 'Unassigned' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                          <User className="h-3 w-3" />
-                          {item.assignee}
-                        </span>
-                      )}
-                      {item.deadline && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(item.deadline).toLocaleDateString()}
-                        </span>
-                      )}
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

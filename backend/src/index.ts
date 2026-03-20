@@ -11,6 +11,7 @@ import authRoutes from './routes/auth';
 import teamRoutes from './routes/team';
 import meetingRoutes from './routes/meeting';
 import actionItemRoutes from './routes/actionItem';
+import integrationRoutes from './routes/integration';
 import path from 'path';
 import fs from 'fs';
 
@@ -56,6 +57,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/meetings', meetingRoutes);
 app.use('/api/action-items', actionItemRoutes);
+app.use('/api/integrations', integrationRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
