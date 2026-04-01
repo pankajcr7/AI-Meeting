@@ -9,6 +9,9 @@ import { connectDB } from './config/db';
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth';
 import teamRoutes from './routes/team';
+import meetingRoutes from './routes/meeting';
+import path from 'path';
+import fs from 'fs';
 
 const app = express();
 
@@ -43,8 +46,14 @@ passport.deserializeUser((user: any, done) => done(null, user));
 
 app.use(passport.initialize());
 
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 app.use('/api/auth', authRoutes);
 app.use('/api/teams', teamRoutes);
+app.use('/api/meetings', meetingRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
